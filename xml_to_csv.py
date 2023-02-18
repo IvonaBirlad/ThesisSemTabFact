@@ -145,3 +145,5 @@ print(table_idx)
 # 	for file in tqdm(train_auto_files):
 # 		with open(file) as f:
 # 			table_idx = read_xml(f, table_idx, tsv_writer, 'train_auto_')
+
+#I make changes here too

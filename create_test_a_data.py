@@ -100,3 +100,6 @@ with open(TSV_FOLDER + 'test_a_set.tsv', 'w') as tsvfile:
 	for file in tqdm(test_a_files):
 		with open(file) as f:
 			table_idx = read_xml(f, table_idx, tsv_writer, 'test_a_')
+
+a = 1
+#I make some changes here
