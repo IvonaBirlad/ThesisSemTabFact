@@ -11,7 +11,7 @@
 
 
 import wandb
-wandb.login(key="fc83bfb374daf6da50faee87c04df09af7ff5712") #Add your wandb key
+wandb.login(key="X") #Add your wandb key
 
 ## 2. Libraries
 
@@ -40,7 +40,6 @@ import torchvision.models as models
 import sys
 
 sys.path.append('./docformer/src/docformer/')
-sys.path.append('/gpfs/home1/ibirlad/.conda/envs/semtabfact_venv/bin/tesseract')
 
 ## Importing the functions from the DocFormer Repo
 from dataset import create_features
@@ -55,9 +54,7 @@ n_classes = 3
 
 ## Setting some hyperparameters
 
-device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-# print(torch.cuda.is_available())
-# print(f"TORCH VERSION: {torch.version.cuda}")
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 ## One can change this configuration and try out new combination
 config = {
@@ -80,9 +77,9 @@ config = {
 ## Importing the data
 from pathlib import Path
 import os
-ROOT_DIRECTORY_PATH = str(Path(__file__).parent)
+ROOT_DIRECTORY_PATH = str(Path(__file__).parent.parent)
 PNG_PATH = "png_data/data_aug.csv"
-# print(os.path.join(ROOT_DIRECTORY_PATH, PNG_PATH))
+print(os.path.join(ROOT_DIRECTORY_PATH, PNG_PATH))
 
 data = pd.read_csv(os.path.join(ROOT_DIRECTORY_PATH, PNG_PATH), index_col=0)
 data["table_name"] = ROOT_DIRECTORY_PATH + "/" + data["table_name"]
@@ -164,9 +161,31 @@ train_ds = SemTabFactData(train_df['table_name'].tolist(), train_df['label'].tol
 val_ds = SemTabFactData(valid_df['table_name'].tolist(), valid_df['label'].tolist(), valid_df['statement'].tolist(),
                         target_size, tokenizer, config['max_position_embeddings'], transform)
 
-### Collate Function:
-# from [here](https: // stackoverflow.com / questions / 65279115 / how - to - use - collate - fn - with-dataloaders)
+for key in list(train_ds[1].keys()):
+    print_statement = '{0: <50}'.format(str(key) + " has a shape:")
+    print(print_statement, train_ds[0][key].shape)
 
+from PIL import Image, ImageDraw
+
+try:
+    original_image = Image.open(train_df["table_name"][5]).convert("RGB")
+except:
+    original_image = Image.new(mode="RGB", size=((500, 500)), color=(255, 255, 255))
+
+sample = np.array(original_image)
+
+# sample = np.transpose(sample, (1, 2, 0)).astype(np.uint8)
+sample = Image.fromarray((sample * 255).astype(np.uint8))
+
+# Visualizing the resized image
+target_size = (512, 384)
+resize_img = sample.resize(target_size)
+resize_img
+
+### Collate Function:
+
+# from [here](https: // stackoverflow.com / questions / 65279115 / how - to - use - collate - fn - with-dataloaders)
+#
 
 def collate_fn(data_bunch):
     '''
@@ -228,7 +247,7 @@ class DocFormerForClassification(nn.Module):
         self.dropout = nn.Dropout(config['hidden_dropout_prob'])
         self.linear_layer = nn.Linear(in_features=config['hidden_size'], out_features=n_classes)  ## Number of Classes
         self.encoder = DocFormerEncoder(config)
-        self.linear = nn.Linear(2*768, 768)
+        self.linear = nn.Linear(256, 128)
 
     def forward(self, batch_dict):
         x_feat = batch_dict['x_features']
@@ -241,11 +260,8 @@ class DocFormerForClassification(nn.Module):
         v_bar = self.resnet(img)
         table_emb = self.lang_emb(table_token)
         statement_emb = self.lang_emb(statement_token)
-        # t_bar = table_emb + statement_emb  #(4, 128, 768)
-        text = torch.cat([table_emb, statement_emb], dim=-1)
-        t_bar = self.linear(text)
-        # print(t_bar.shape)
-        # t_bar = t_bar.long()
+        t_bar = table_emb + statement_emb
+
         out = self.encoder(t_bar, v_bar, t_bar_s, v_bar_s)
         out = self.linear_layer(out)
         out = out[:, 0, :]
@@ -276,15 +292,15 @@ class DocFormer(pl.LightningModule):
         self.val_accuracy_metric = torchmetrics.Accuracy(task='multiclass',
                                                          num_classes=self.num_classes)
         self.f1_metric = torchmetrics.F1Score(task='multiclass', num_classes=self.num_classes)
-        # self.precision_macro_metric = torchmetrics.Precision(
-        #     average="macro", task='multiclass', num_classes=self.num_classes
-        # )
-        # self.recall_macro_metric = torchmetrics.Recall(
-        #     average="macro", task='multiclass', num_classes=self.num_classes
-        # )
-        # self.precision_micro_metric = torchmetrics.Precision(average="micro", task='multiclass',
-        #                                                      num_classes=self.num_classes)
-        # self.recall_micro_metric = torchmetrics.Recall(average="micro", task='multiclass', num_classes=self.num_classes)
+        self.precision_macro_metric = torchmetrics.Precision(
+            average="macro", task='multiclass', num_classes=self.num_classes
+        )
+        self.recall_macro_metric = torchmetrics.Recall(
+            average="macro", task='multiclass', num_classes=self.num_classes
+        )
+        self.precision_micro_metric = torchmetrics.Precision(average="micro", task='multiclass',
+                                                             num_classes=self.num_classes)
+        self.recall_micro_metric = torchmetrics.Recall(average="micro", task='multiclass', num_classes=self.num_classes)
         self.label = []
         self.logit = []
 
@@ -302,8 +318,8 @@ class DocFormer(pl.LightningModule):
         train_acc = self.train_accuracy_metric(preds, batch["label"])
 
         ## Logging
-        self.log('train/loss', loss, prog_bar=True, on_epoch=True, logger=True)
-        self.log('train/acc', train_acc, prog_bar=True, on_epoch=True, logger=True)
+        self.log('train/loss', loss, prog_bar=True, on_epoch=True, logger=True, on_step=True)
+        self.log('train/acc', train_acc, prog_bar=True, on_epoch=True, logger=True, on_step=True)
 
         return loss
 
@@ -315,23 +331,23 @@ class DocFormer(pl.LightningModule):
         labels = batch['label']
         # Metrics
         valid_acc = self.val_accuracy_metric(preds, labels)
-        # precision_macro = self.precision_macro_metric(preds, labels)
-        # recall_macro = self.recall_macro_metric(preds, labels)
-        # precision_micro = self.precision_micro_metric(preds, labels)
-        # recall_micro = self.recall_micro_metric(preds, labels)
+        precision_macro = self.precision_macro_metric(preds, labels)
+        recall_macro = self.recall_macro_metric(preds, labels)
+        precision_micro = self.precision_micro_metric(preds, labels)
+        recall_micro = self.recall_micro_metric(preds, labels)
         f1 = self.f1_metric(preds, labels)
 
         # Logging metrics
         self.log("valid/loss", loss, prog_bar=True, on_step=True, logger=True)
         self.log("valid/acc", valid_acc, prog_bar=True, on_epoch=True, logger=True, on_step=True)
-        # self.log("valid/precision_macro", precision_macro, prog_bar=True, on_epoch=True, logger=True, on_step=True)
-        # self.log("valid/recall_macro", recall_macro, prog_bar=True, on_epoch=True, logger=True, on_step=True)
-        # self.log("valid/precision_micro", precision_micro, prog_bar=True, on_epoch=True, logger=True, on_step=True)
-        # self.log("valid/recall_micro", recall_micro, prog_bar=True, on_epoch=True, logger=True, on_step=True)
+        self.log("valid/precision_macro", precision_macro, prog_bar=True, on_epoch=True, logger=True, on_step=True)
+        self.log("valid/recall_macro", recall_macro, prog_bar=True, on_epoch=True, logger=True, on_step=True)
+        self.log("valid/precision_micro", precision_micro, prog_bar=True, on_epoch=True, logger=True, on_step=True)
+        self.log("valid/recall_micro", recall_micro, prog_bar=True, on_epoch=True, logger=True, on_step=True)
         self.log("valid/f1", f1, prog_bar=True, on_epoch=True)
         self.label.append(batch['label'])
         self.logit.append(logits)
-        return loss
+        # return {"label": batch['label'], "logits": logits}
 
     def on_validation_epoch_end(self):
         # val_loss_mean = np.mean(self.training_losses)
@@ -356,41 +372,31 @@ from pytorch_lightning.loggers import WandbLogger
 def main():
     datamodule = DataModule(train_ds, val_ds)
     docformer = DocFormer(config)
-    MODELPATH = "./models"
-
 
     checkpoint_callback = ModelCheckpoint(
-        monitor="valid/loss", dirpath=MODELPATH, mode="min"
+        dirpath="./models", monitor="valid/loss", mode="min"
     )
     early_stopping_callback = EarlyStopping(
         monitor="valid/loss", patience=3, verbose=True, mode="min"
     )
 
-    wandb.init(config=config, project="SemTabFact with DocFormer Snel")
-    wandb_logger = WandbLogger(project="SemTabFact with DocFormer Snel", entity="birladivona")
+    wandb.init(config=config, project="SemTabFact with DocFormer New Version")
+    wandb_logger = WandbLogger(project="SemTabFact with DocFormer New Version", entity="birladivona")
     ## https://www.tutorialexample.com/implement-reproducibility-in-pytorch-lightning-pytorch-lightning-tutorial/
     pl.seed_everything(seed, workers=True)
     trainer = pl.Trainer(
         default_root_dir="logs",
-        max_epochs=10,
+        max_epochs=1,
         fast_dev_run=False,
         logger=wandb_logger,
         callbacks=[checkpoint_callback, early_stopping_callback],
-        deterministic=True,
-        accelerator="gpu",
-        devices=2,
-        strategy="ddp"
+        deterministic=True
     )
-    if torch.cuda.is_available():
-        docformer = docformer.to(device)
     trainer.fit(docformer, datamodule)
-    return docformer
 
 
 if __name__ == "__main__":
-    docformer = main()
-
-
+    main()
 
 ## References:
 # 1.[DocFormer Repo](https: // github.com / uakarsh / docformer)
