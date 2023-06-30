@@ -8,13 +8,13 @@ Two tasks are defined by the SemEval Task organizers:
 
 ### Table Statement Support
 
-The first subtask of this project is to determine whether a table supports a given statement. This will involve developing a method to analyze the table data and determine whether the statement is supported by the information presented.
+The first subtask of this project is to determine whether a table supports a given statement. This involves finetuning a multi-modal DocFormer model for a table NLI task to analyze the table data and determine whether the statement is supported by the information presented.
 
 ### Relevant Cell Selection
 
-The second subtask of this project is to identify the cells in the table that provide evidence for the statement. This will involve developing a method to analyze the table data and determine which cells contain the information needed to support the statement.
+The second subtask of this project is to identify the cells in the table that provide evidence for the statement. This involves developing a method to interpret the predictions of the DocFormer model.
 
 ## Data
 
-The data used for this project consists of tables from scientific articles and corresponding verification statements. Manually annotated data was made available to indicate which cells support a given statement which data will be used to train and evaluate the models developed as part of this project. Automatically generated annotations will also be added to supplement training data. 
+The data used for this project consists of tables from scientific articles and corresponding verification statements. These tables are extracted from XMLs and transformed into PNGs, then augmented to randomly add the "Unknown" class to the training data. 
 

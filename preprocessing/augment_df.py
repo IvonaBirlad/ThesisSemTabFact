@@ -1,12 +1,5 @@
-"""
-    Description: 
-    Augments the DF directly and inserts unknown statements randomly in each table from other tables in the same file, if no other tables, then it randomly selects the statements from other files
+# Augment the DF directly and inserts unknown statements in each table from other tables in the same file
 
-    input: CSV containing the table_name, statement, and label columns
-    output: Another CSV, with added "unknown" statements
-
-    Author: Harshit Varma (GitHub: @hrshtv)
-"""
 
 import re
 import sys
@@ -17,8 +10,8 @@ from tqdm import tqdm
 
 random.seed(0) # Set seed
 
-csv_path = "C:/Users/ivona/Desktop/MSc Thesis/semtabfact/semtabfact/png_data/data_manual.csv" # Input path: "../../dataset/train_manual_v1.3.2/v1.3.2/data.csv"
-save_path = "C:/Users/ivona/Desktop/MSc Thesis/semtabfact/semtabfact/png_data/data_aug.csv" # Ouput path: "data_aug.csv"
+csv_path = "./png_data_auto/data_manual_auto.csv"
+save_path = "./png_data_auto/data_aug_auto.csv"
 
 df = pd.read_csv(csv_path, index_col = "id")
 
@@ -50,11 +43,11 @@ for i, tname_1 in enumerate(tqdm(table_names)):
 
     # Get all tables in the same file as tname_1, tname_1 of the form: path/filename_tableno.csv
     root_path = tname_1.split("/")[0]
-    print(root_path)
+    # print(root_path)
     fname   = tname_1.split("/")[-1].split("_")[0]
-    print(fname)
-    pattern = re.compile(f"{root_path}/{fname}_[0-9]+.png")
-    print(pattern)
+    # print(fname)
+    pattern = re.compile(f"{root_path}/{fname}_a[0-9]+.png")
+    # print(tname_1)
     matches = list(filter(pattern.match, table_names))
     matches.remove(tname_1) # Remove self, since that will be always matched
     n_matches = len(matches)

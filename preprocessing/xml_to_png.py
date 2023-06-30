@@ -1,18 +1,5 @@
-"""
-    Description:
-    Creates the main df with table_name and statement as columns,
-    while simultaneously creating the CSV files for the tables
-    This is done simultaneously to avoid any ordering discrepancy
-    This file is meant to be for augmented data, with 3 (or 2) classes
-    Here, we also incorporate table legend, caption and footer
-    A table MAY have a caption, a legend and/or a footnote
-    caption : Treated as a single row at the top of the table, with cell.text = caption.text
-    legend : Treated as a single row added after the caption, since the model should "know" the legends used before seeing the table. Another thing to try: Add legend both at the start AND at the end
-    footnote : Treated as a single row at the end of the table, with cell.text = footnote.text
-    We consider a data sample as a (table, statement) pair and not (table, statements)
+# Create the main df with table_name and statement as columns as well as the PNG files of the tables
 
-    Author: Harshit Varma (GitHub: @hrshtv)
-"""
 
 import os
 import sys
@@ -33,7 +20,6 @@ labels = []
 
 
 def getTableDims(t):
-    """ Returns the dimension of table taking into account nested headers etc """
     rows = t.findall("row")  # can be used for making the table
     n_rows = len(rows)  # Total number of rows in the table, including sub-headers etc
     # Now we need to find n_cols
@@ -48,7 +34,6 @@ def getTableDims(t):
 
 
 def xmlToDataframe(t):
-    """ Converts given table node to a pandas dataframe """
     n_rows, n_cols = getTableDims(t)
 
     # Initialize a n_rows x n_cols table
@@ -96,44 +81,7 @@ def xmlToDataframe(t):
     return df_table
 
 
-def csvBuilder(base_path, csv_path, filename):
-    """ Helps building the main dataframe from the output file """
-    outpath = f"{base_path}/{filename}"
-    filename_raw = filename.split(".")[0]  # Remove the .xml extension
-
-    csv_rel_path = csv_path.split("/")[-1]
-
-    allowed_types = ["entailed", "refuted", "unknown"]
-    label_map = {"entailed": 1, "refuted": 0, "unknown": 2}
-
-    tree = ET.parse(outpath)  # The element tree
-    root = tree.getroot()  # Root node
-
-    i = 1  # Index for the table
-    for t in root.iter("table"):  # Iterate over all tables
-
-        # Create and save the table as a CSV
-        df_table = xmlToDataframe(t)  # Convert to dataframe
-        tmp_outpath = f"{filename_raw}_{i}.csv"
-        df_table.to_csv(
-            f"{csv_path}/{tmp_outpath}",
-            header=False,
-            index=False
-        )
-
-        # Build the CSV
-        for s in t.iter("statement"):
-            stype = s.attrib["type"]
-            stext = s.attrib["text"].replace(",", " ")
-            if stype in allowed_types:
-                label = label_map[stype]
-                labels.append(label)
-                table_names_list.append(f"{csv_rel_path}/{tmp_outpath}")
-                statement_list.append(stext)
-        i += 1
-
 def pngBuilder(base_path, png_path, filename):
-    """ Writes all pngs && Helps building the main dataframe from the output file """
     outpath = f"{base_path}/{filename}"
     filename_raw = filename.split(".")[0]  # Remove the .xml extension
 
@@ -148,12 +96,12 @@ def pngBuilder(base_path, png_path, filename):
     i = 1  # Index for the table
     for t in root.iter("table"):  # Iterate over all tables
 
-        # Create and save the table as a CSV
+        # Create and save the table as a PNG
         df_table = xmlToDataframe(t)  # Convert to dataframe
-        tmp_outpath = f"{filename_raw}_{i}.png"
-        df_table.dfi.export(f"{png_path}/{tmp_outpath}", table_conversion="selenium")
+        tmp_outpath = f"{filename_raw}_t{i}.png"
+        df_table.dfi.export(f"{png_path}/{tmp_outpath}", max_rows=-1)
 
-        # Build the CSV
+        # Build the PNG
         for s in t.iter("statement"):
             stype = s.attrib["type"]
             stext = s.attrib["text"].replace(",", " ")
@@ -167,18 +115,14 @@ def pngBuilder(base_path, png_path, filename):
 
 if __name__ == "__main__":
 
-    BASE_PATH = 'C:/Users/ivona/Desktop/MSc Thesis/semtabfact/semtabfact/xml/train_manual_v1.3.2/v1.3.2/output/' #sys.argv[1]  # augmented_dataset/train_manual_v1.3.2/
-    CSV_PATH = 'C:/Users/ivona/Desktop/MSc Thesis/semtabfact/semtabfact/csv_data' #sys.argv[2]  # augmented_dataset/csv_data/csv_manual (don't add the trailing '/')
-    PNG_PATH = 'C:/Users/ivona/Desktop/MSc Thesis/semtabfact/semtabfact/png_data' #sys.argv[2]  # augmented_dataset/csv_data/csv_manual (don't add the trailing '/')
-    DF_SAVE_PATH = "C:/Users/ivona/Desktop/MSc Thesis/semtabfact/semtabfact/png_data/data_manual.csv" #sys.argv[3]  # augmented_dataset/csv_data/data_manual.csv
+    BASE_PATH = './xml/output_test/'
+    PNG_PATH = './png_data_test'
+    DF_SAVE_PATH = "./png_data_test/data_test.csv"
     FILE_RE = "*.xml"  # RegEx used while scanning the input directory
 
-    if not os.path.exists(f"{CSV_PATH}"):
-        os.makedirs(f"{CSV_PATH}")
     if not os.path.exists(f"{PNG_PATH}"):
         os.makedirs(f"{PNG_PATH}")
 
-    # Sorted to ensure order is deterministic, by default glob.glob scans in (ls -U) order
     for fullpath in tqdm(sorted(glob.glob(os.path.join(BASE_PATH, FILE_RE)))):
         filename = os.path.basename(os.path.normpath(fullpath))
         pngBuilder(BASE_PATH, PNG_PATH, filename)
